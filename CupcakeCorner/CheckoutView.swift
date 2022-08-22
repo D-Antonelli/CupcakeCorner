@@ -13,6 +13,9 @@ struct CheckoutView: View {
     @State private var confirmationMessage = ""
     @State private var showingConfirmation = false
     
+    @State private var errorMessage = ""
+    @State private var showingErrorMessage = false
+    
     var body: some View {
         ScrollView {
             VStack {
@@ -30,11 +33,11 @@ struct CheckoutView: View {
                 
                 Button("Place Order") {
                     Task {
-                       await placeOrder()
+                        await placeOrder()
                     }
                     
                 }
-                    .padding()
+                .padding()
             }
         }
         .navigationTitle("Check out")
@@ -44,31 +47,51 @@ struct CheckoutView: View {
         } message: {
             Text(confirmationMessage)
         }
+        .alert("", isPresented: $showingErrorMessage) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage)
+        }
     }
     
     func placeOrder() async {
         // convert object to json
         guard let encoded = try? JSONEncoder().encode(order) else {
             print("Failed to encode order")
-               return
+            return
         }
         // send data over network call
         let url = URL(string: "https://reqres.in/api/cupcakes")!
         var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpMethod = "POST"
+//                request.httpMethod = "POST"
         // run request and process the response
-        do {
-            let (data, _) = try await URLSession.shared.upload(for: request, from: encoded)
-            
-            let decodedOrder = try JSONDecoder().decode(Order.self, from: data)
-            confirmationMessage = "Your order for \(decodedOrder.quantity)x \(Order.types[decodedOrder.type].lowercased()) cupcakes is on its way!"
-            showingConfirmation = true
-            // handle the result
-        } catch {
-            print("Checkout failed.")
+        let task = URLSession.shared.uploadTask(with: request, from: encoded) { data, response, error in
+            if let error = error {
+                errorMessage = "There was an error. Please try again"
+                showingErrorMessage = true
+                return
+            }
+            guard let response = response as? HTTPURLResponse,
+                  (200...299).contains(response.statusCode) else {
+                errorMessage = "There was a server error. Please try again"
+                showingErrorMessage = true
+                return
+            }
+            if let mimeType = response.mimeType,
+               mimeType == "application/json",
+               let data = data {
+                do {
+                    let decodedOrder = try JSONDecoder().decode(Order.self, from: data)
+                    confirmationMessage = "Your order for \(decodedOrder.quantity)x \(Order.types[decodedOrder.type].lowercased()) cupcakes is on its way!"
+                    showingConfirmation = true
+                } catch {
+                    errorMessage = "There was an error. Please try again"
+                    showingErrorMessage = true
+                }
+            }
         }
-        
+        task.resume()
     }
 }
 
