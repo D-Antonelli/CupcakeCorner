@@ -10,7 +10,7 @@ import SwiftUI
 
 class Order: ObservableObject, Codable {
     
-    enum CodingKeys: CodingKey {
+    enum CodingKeys: CodingKey { 
         case dataModel
     }
     

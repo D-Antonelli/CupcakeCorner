@@ -25,6 +25,7 @@ struct CheckoutView: View {
                         .scaledToFit()
                 } placeholder: {
                     ProgressView()
+                        .accessibilityHidden(true)
                 }
                 .frame(height: 233)
                 
